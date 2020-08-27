@@ -12,17 +12,17 @@ var client *redis.Client
 
 func init() {
 	client = redis.NewClient(&redis.Options{
-		Addr:     "10.12.35.6:6379",
+		Addr:     "localhost:6379",
 		Password: "",
 		DB:       0,
 	})
 }
 
 func main() {
-	key := "cc"
-	var capacity int64 = 50
-	for i := 0; i < 15; i++ {
-		rs := bucketTokenRateLimit(key, 1*time.Minute, 30, capacity)
+	key := "111"
+	var capacity int64 = 2
+	for i := 0; i < 10; i++ {
+		rs := bucketTokenRateLimit(key, 1*time.Second, 1, capacity)
 		fmt.Println(rs)
 	}
 }
@@ -34,7 +34,7 @@ func bucketTokenRateLimit(key string, fillInterval time.Duration, limitNum int64
 	numKey := "num"
 	lastTimeKey := "lasttime"
 	currentTime := time.Now().Unix()
-	//only init once
+	//only init once fill fully
 	client.HSetNX(currentKey, numKey, capacity).Result()
 	client.HSetNX(currentKey, lastTimeKey, currentTime).Result()
 
@@ -43,16 +43,13 @@ func bucketTokenRateLimit(key string, fillInterval time.Duration, limitNum int64
 	lastNum, _ := strconv.ParseInt(result[0].(string), 0, 64)
 	lastTime, _ := strconv.ParseInt(result[1].(string), 0, 64)
 	rate := float64(limitNum) / float64(fillInterval.Seconds())
-	fmt.Println(rate)
 	incrNum := int64(math.Ceil(float64(currentTime-lastTime) * rate)) //increment number from lasttime to currenttime
-	fmt.Println(incrNum)
 	currentNum := min(lastNum+incrNum, capacity)
 
 	//can access
 	if currentNum > 0 {
 		var fields = map[string]interface{}{lastTimeKey: currentTime, numKey: currentNum - 1}
-		a := client.HMSet(currentKey, fields)
-		fmt.Println(a)
+		client.HMSet(currentKey, fields)
 		return true
 	}
 	return false
